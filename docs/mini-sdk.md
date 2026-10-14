@@ -7,7 +7,7 @@ libdataplus from its original source with Hollyhock's current SH4A GCC.
 | Component | Source |
 | --- | --- |
 | Compiler/assembler/linker | `ghcr.io/classpaddev/hollyhock-3:v2.2.2` |
-| Graphics, keyboard, syscall and utility libraries | [brijohn/libdataplus](https://github.com/brijohn/libdataplus) at pinned SHA |
+| Graphics, keyboard, syscall and utility libraries | [TheRainbowPhoenix/libdataplus-ex](https://github.com/TheRainbowPhoenix/libdataplus-ex), latest `master` by default; ref override supported |
 | Converter | [brijohn/elf2d01](https://github.com/brijohn/elf2d01) at pinned SHA, compiled locally |
 | CRT0 and memory map | `exword/exword_crt0.s` and `exword/exword.ld` |
 | EX-word dictionary packaging | `Makefile.minisdk` and existing `html/` metadata |
@@ -24,6 +24,18 @@ docker run --rm --platform linux/amd64 -v "$PWD:/work" -w /work \
 
 Outputs: `.mini-sdk/lib`, `.mini-sdk/include`, `.mini-sdk/bin/elf2d01`,
 and `build-minisdk/{ja,cn}/XDTST/`.
+
+## Develop quickly using libdataplus-ex
+
+The build now pulls **[TheRainbowPhoenix/libdataplus-ex](https://github.com/TheRainbowPhoenix/libdataplus-ex)** rather than Brian Johnson's upstream repository. By default, it resolves your fork's current `master` branch **at each CI run**, so library changes do not require changing a pinned commit in this app repository.
+
+- Push a change to `libdataplus-ex/master`, then re-run the mini-SDK workflow in `exword-xd-a8500-TEST` (or push a change to its experimental branch).
+- For a specific library branch or SHA, use **Actions → EXPERIMENT - Source-built EX-word mini SDK → Run workflow** and fill `libdataplus_ref` (once the workflow is available from the repository default branch), or set `LIBDATAPLUS_REF=my-branch` when running the build locally.
+- Each artifact includes `.mini-sdk/source-provenance.txt` recording the source repository and resolved commit SHA. Use that SHA for exact builds later.
+
+A push to the **other repository** does **not** automatically trigger this workflow: cross-repo triggering needs an explicit dispatch integration or CI job on the library fork.
+
+**Note:** Since `master` is followed dynamically, two runs with identical EX-word repository commits may build different versions of the library if its branch advances. The provenance record is the authoritative revision for each run.
 
 ## Future development
 
@@ -67,7 +79,7 @@ interrupt context, clock/power, peripheral state and restoration tests.
 ## License/provenance note
 
 `elf2d01` is GPL-2.0. The source-only prototype builds libraries from
-[brijohn/libdataplus](https://github.com/brijohn/libdataplus), but GitHub
+[TheRainbowPhoenix/libdataplus-ex](https://github.com/TheRainbowPhoenix/libdataplus-ex) (forked from [brijohn/libdataplus](https://github.com/brijohn/libdataplus)), but GitHub
 does not identify an SPDX license or a root COPYING/LICENSE in that
 repository. **Confirm the libdataplus reuse and binary redistribution
 permissions with its maintainer before distributing a public standalone

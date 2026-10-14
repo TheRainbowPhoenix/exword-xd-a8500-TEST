@@ -5,6 +5,12 @@ on:
     branches: [experiment/source-built-exword-sdk]
   pull_request:
   workflow_dispatch:
+    inputs:
+      libdataplus_ref:
+        description: 'Branch, tag or commit in TheRainbowPhoenix/libdataplus-ex'
+        type: string
+        required: false
+        default: master
 
 permissions:
   contents: read
@@ -13,6 +19,8 @@ jobs:
   source-sdk:
     name: Rebuild SDK with Hollyhock GCC (no DevKitPRO archive)
     runs-on: ubuntu-24.04
+    env:
+      LIBDATAPLUS_REF: ${{ inputs.libdataplus_ref || 'master' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +39,8 @@ jobs:
           set -euo pipefail
           docker run --rm --platform linux/amd64 \
             -v "$PWD:/work" -w /work --entrypoint /bin/bash \
+            -e LIBDATAPLUS_REF \
+
             ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
             -ec 'git config --global --add safe.directory /work/.deps/elf2d01; export PATH=/toolchain/bin:$PATH; bash scripts/build-mini-sdk.sh'
 
@@ -43,6 +53,9 @@ jobs:
           grep -Eq 'Entry point address:[[:space:]]+0x70000080' build-minisdk/elf-header.txt
           cmp build-minisdk/ja/XDTST/xdtest.d01 build-minisdk/cn/XDTST/xdtest.d01
           file build-minisdk/xdtest.elf build-minisdk/xdtest.d01
+          grep -Fq 'libdataplus_repository=https://github.com/TheRainbowPhoenix/libdataplus-ex.git' .mini-sdk/source-provenance.txt
+          echo "## libdataplus-ex build provenance" >> "$GITHUB_STEP_SUMMARY"
+          cat .mini-sdk/source-provenance.txt >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -51,6 +64,7 @@ jobs:
             build-minisdk/ja/
             build-minisdk/cn/
             build-minisdk/elf-header.txt
+            .mini-sdk/source-provenance.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -61,5 +75,6 @@ jobs:
             .mini-sdk/include/
             .mini-sdk/lib/
             .mini-sdk/bin/
+            .mini-sdk/source-provenance.txt
           if-no-files-found: error
           retention-days: 14

@@ -18,7 +18,7 @@ This repository is inspired by [yukkuri-Dev/EXtend-Word](https://github.com/yukk
 
 We are testing a *source-built*, GCC 15-based [EX-word mini SDK](docs/mini-sdk.md).
 This uses [Hollyhock GCC](https://github.com/ClasspadDev/hollyhock-3),
-builds `libdataplus` from pinned public source, and compiles the
+builds `libdataplus` from [our libdataplus-ex fork](https://github.com/TheRainbowPhoenix/libdataplus-ex) (latest `master` by default), and compiles the
 `elf2d01` converter locally. No MaxSignal DevKitPRO binary archive is used.
 [View its separate CI workflow](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/mini-exword-sdk.yml).
 It is not yet hardware validated.
