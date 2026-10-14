@@ -14,6 +14,16 @@ As this repository is based on GPL-2.0 licensed [Gnuboy EX](https://github.com/b
 
 This repository is inspired by [yukkuri-Dev/EXtend-Word](https://github.com/yukkuri-Dev/EXtend-Word), and the automatic build uses a prebuilt toolchain distributed at [MaxSignal/buildscripts](https://github.com/MaxSignal/buildscripts).
 
+## Experimental compiler: Hollyhock SH4A GCC
+
+A separate [Hollyhock SH4 experiment](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/hollyhock-sh4.yml)
+tries the modern `sh4a_nofpueb-elf-gcc` from the
+[Hollyhock 3 container](https://github.com/ClasspadDev/hollyhock-3).
+It uses [`Makefile.hollyhock`](Makefile.hollyhock), a dedicated EX-word
+linker script/startup stub, and legacy libdataplus/`elf2d01`.
+See [the experiment's design and limitations](docs/hollyhock-experiment.md).
+**Experimental builds are not yet hardware-tested.** The default build is unchanged.
+
 ## Download a build (ZIP, no GitHub Release needed)
 
 The [Build workflow](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/build.yml)

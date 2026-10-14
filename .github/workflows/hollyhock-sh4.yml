@@ -46,6 +46,8 @@ jobs:
         run: |
           set -euo pipefail
           file build-hollyhock/xdtest.elf build-hollyhock/xdtest.d01
+          # The EX-word-specific linker script must place _start at ROM 0x70000080.
+          grep -Eq 'Entry point address:[[:space:]]+0x70000080' build-hollyhock/elf-header.txt
           for region in ja cn; do
             test -s "build-hollyhock/$region/XDTST/xdtest.d01"
             test -f "build-hollyhock/$region/XDTST/diction.htm"
