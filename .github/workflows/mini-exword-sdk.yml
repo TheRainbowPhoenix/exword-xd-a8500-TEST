@@ -16,6 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build native ELF-to-D01 tool from upstream source
+        run: |
+          set -euo pipefail
+          source sdk-exword/sources.env
+          mkdir -p .deps/elf2d01 .mini-sdk/bin
+          git -C .deps/elf2d01 init -q
+          git -C .deps/elf2d01 fetch -q --depth 1 https://github.com/brijohn/elf2d01.git "$ELF2D01_COMMIT"
+          git -C .deps/elf2d01 checkout -q --detach FETCH_HEAD
+          cc -O2 -Wall -Wextra .deps/elf2d01/elf2d01.c -o .mini-sdk/bin/elf2d01
+
       - name: Rebuild all EX-word components from source
         run: |
           set -euo pipefail
