@@ -1,0 +1,92 @@
+name: EXPERIMENT - Original libdataplus compiler comparison
+
+on:
+  push:
+    branches: [experiment/source-built-exword-sdk]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-libs:
+    name: ${{ matrix.compiler }} GCC + original libdataplus (hello and grid)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [hollyhock, devkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the same original devkitPro archive for both variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/legacy"
+          curl -fsSL --retry 3 \
+            https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz \
+            | tar xzf - -C "$RUNNER_TEMP/legacy"
+          test -x "$RUNNER_TEMP/legacy/devkitPro/tools/bin/elf2d01"
+          test -s "$RUNNER_TEMP/legacy/devkitPro/libdataplus/lib/libgraphics.a"
+          test -s "$RUNNER_TEMP/legacy/devkitPro/libdataplus/lib/libsh4a.a"
+          sha256sum "$RUNNER_TEMP/legacy/devkitPro/libdataplus/lib/"*.a
+
+      - name: Compile with Hollyhock GCC and ORIGINAL libdataplus
+        if: matrix.compiler == 'hollyhock'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" \
+            -v "$RUNNER_TEMP/legacy/devkitPro:/legacy/devkitPro:ro" \
+            -w /work -e TOOLCHAIN=hollyhock -e DEVKITPRO=/legacy/devkitPro \
+            --entrypoint /bin/bash \
+            ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
+            -ec 'export PATH=/toolchain/bin:$PATH; bash scripts/build-original-lib-comparison.sh'
+
+      - name: Compile with ORIGINAL devkitSH4 GCC and ORIGINAL libdataplus
+        if: matrix.compiler == 'devkit'
+        shell: bash
+        env:
+          TOOLCHAIN: devkit
+          DEVKITPRO: ${{ runner.temp }}/legacy/devkitPro
+        run: |
+          set -euo pipefail
+          bash scripts/build-original-lib-comparison.sh
+
+      - name: Validate both Japanese/Chinese dictionary packages
+        shell: bash
+        env:
+          TOOLCHAIN: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          if [ "$TOOLCHAIN" = hollyhock ]; then
+            ids="HHLLO/hhllo HHGRD/hhgrd"
+          else
+            ids="DVLLO/dvllo DVGRD/dvgrd"
+          fi
+          for variant in $ids; do
+            id="$(printf '%s' "$variant" | cut -d/ -f1)"
+            module="$(printf '%s' "$variant" | cut -d/ -f2)"
+            for region in ja cn; do
+              test -s "comparison/$TOOLCHAIN/$region/$id/$module.d01"
+              test -f "comparison/$TOOLCHAIN/$region/$id/diction.htm"
+              test -f "comparison/$TOOLCHAIN/$region/$id/fileinfo.cji"
+            done
+            cmp "comparison/$TOOLCHAIN/ja/$id/$module.d01" \
+                "comparison/$TOOLCHAIN/cn/$id/$module.d01"
+          done
+          file "comparison/$TOOLCHAIN"/ja/*/*.d01
+          echo "## ${{ matrix.compiler }} + original libs" >> "$GITHUB_STEP_SUMMARY"
+          cat "comparison/$TOOLCHAIN/README-EXPERIMENT.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload download-ready JA and CN packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: probes-${{ matrix.compiler }}-original-lib
+          path: comparison/${{ matrix.compiler }}/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
