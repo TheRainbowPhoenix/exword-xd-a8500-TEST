@@ -29,7 +29,7 @@ and `build-minisdk/{ja,cn}/XDTST/`.
 
 The build now pulls **[TheRainbowPhoenix/libdataplus-ex](https://github.com/TheRainbowPhoenix/libdataplus-ex)** rather than Brian Johnson's upstream repository. By default, it resolves your fork's current `master` branch **at each CI run**, so library changes do not require changing a pinned commit in this app repository.
 
-- Push a change to `libdataplus-ex/master`, then re-run the mini-SDK workflow in `exword-xd-a8500-TEST` (or push a change to its experimental branch).
+- Push a change to `libdataplus-ex/master`, then open the most recent successful [mini-SDK CI run](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/mini-exword-sdk.yml) in `exword-xd-a8500-TEST` and select **Re-run all jobs**. The fetch happens on every run, including re-runs; no dummy commit is needed. Artifact uploads use `overwrite: true` so re-runs can replace earlier ZIPs. Alternatively, push to the EX-word experimental branch.
 - For a specific library branch or SHA, use **Actions → EXPERIMENT - Source-built EX-word mini SDK → Run workflow** and fill `libdataplus_ref` (once the workflow is available from the repository default branch), or set `LIBDATAPLUS_REF=my-branch` when running the build locally.
 - Each artifact includes `.mini-sdk/source-provenance.txt` recording the source repository and resolved commit SHA. Use that SHA for exact builds later.
 
