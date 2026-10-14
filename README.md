@@ -1,3 +1,25 @@
+# MEMBR — white-theme EX-word raw memory browser
+
+**New devkitSH4 build:** [MEMBR (read-only memory browser)](docs/devkit-memory-browser.md)
+explores any 32-bit address as hex + ASCII with a **white theme** and a
+**Jump-to-address editor**. It is compiled with the **original devkitSH4
+compiler and original prebuilt libdataplus**—the compiler/library combination
+whose Hello and grid probes both worked on real hardware.
+
+[Download a Japanese or Chinese ZIP from the MEMBR build workflow](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/devkit-memory-browser.yml).
+
+**This does not guarantee every address is actually readable.** The
+application performs direct volatile byte reads without a whitelist, and
+an unmapped or protected address can reboot or hang the EX-word. It begins
+in its own allocated RAM. The browser is **read only**, with no memory
+writes, file access, search or automatic scanning.
+
+The old Hollyhock-based `HEXED` remains an unvalidated experiment,
+not the recommended hardware test. The known-working devkitSH4 Hello/grid
+probes remain unchanged.
+
+---
+
 # HEXED — minimal EX-word hex editor
 
 Experimental **HEXED** editor for CASIO EX-word dictionaries, built using
