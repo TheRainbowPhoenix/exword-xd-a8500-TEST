@@ -1,0 +1,98 @@
+# EXPERIMENTAL: compile the EX-word add-on with hollyhock/HHK3's
+# sh4a_nofpueb-elf-gcc instead of devkitSH4's patched sh-elf-gcc.
+# Retain libdataplus headers/libs and elf2d01 from the legacy SDK;
+# the ClassPad SDK /sdk/lib can NOT replace libdataplus.
+#
+# Usage: DEVKITPRO=/path/to/devkitPro make -f Makefile.hollyhock
+# Expects sh4a_nofpueb-elf-* tools on PATH.
+# exword/{exword.ld,exword_crt0.s} mirror the historical devkitSH4
+# files distributed by MaxSignal/buildscripts under the GNU toolchain terms.
+.DEFAULT_GOAL := all
+
+ifndef DEVKITPRO
+$(error Set DEVKITPRO to the extracted legacy devkitPro root (for libdataplus and elf2d01))
+endif
+
+PREFIX      ?= sh4a_nofpueb-elf-
+CC          := $(PREFIX)gcc
+OBJDUMP     := $(PREFIX)objdump
+READELF     := $(PREFIX)readelf
+ELF2D01     ?= $(DEVKITPRO)/tools/bin/elf2d01
+
+APPID       := XDTST
+APPTITLE    := XD-N8500 TEST
+TARGET      := xdtest
+APPMOD      := $(TARGET).d01
+BUILDDIR    := build-hollyhock
+ELF         := $(BUILDDIR)/$(TARGET).elf
+D01         := $(BUILDDIR)/$(TARGET).d01
+
+LIBDATAPLUS := $(DEVKITPRO)/libdataplus
+CFILES      := $(wildcard src/*.c) $(wildcard src/libc/*.c)
+SFILES      := $(wildcard src/*.s) $(wildcard src/libc/*.s)
+CRT0        := $(BUILDDIR)/exword/exword_crt0.o
+OBJECTS     := $(CRT0) $(addprefix $(BUILDDIR)/,$(CFILES:.c=.o) $(SFILES:.s=.o))
+DEPFILES    := $(OBJECTS:.o=.d)
+
+# Use compiler default SH4A big-endian no-FPU architecture. devkitSH4's
+# -mexword also supplies an EX-word linker script and startup stub; both are
+# now explicitly supplied in exword/ rather than relying on a default ELF link.
+CFLAGS      := -std=gnu17 -O2 -Wall -Wextra -ffreestanding -fno-builtin \
+               -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP
+ASFLAGS     := -x assembler-with-cpp
+LDFLAGS     := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(LIBDATAPLUS)/lib
+LDLIBS      := -ldataplus -lgraphics -lsh4a -lgcc
+
+.PHONY: all clean check-toolchain diagnose package
+all: check-toolchain package
+
+check-toolchain:
+	@command -v $(CC) >/dev/null || { echo 'Missing cross compiler $(CC)' >&2; exit 1; }
+	@test -f "$(LIBDATAPLUS)/include/graphics/drawing.h" || { echo 'Missing libdataplus headers: $(LIBDATAPLUS)' >&2; exit 1; }
+	@test -x "$(ELF2D01)" || { echo 'Missing legacy elf2d01 converter: $(ELF2D01)' >&2; exit 1; }
+	@$(CC) --version | head -n 1
+	@$(CC) -dumpmachine
+
+$(BUILDDIR)/%.o: %.c
+	@mkdir -p "$(dir $@)"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/%.o: %.s
+	@mkdir -p "$(dir $@)"
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(ELF): $(OBJECTS) exword/exword.ld
+	@mkdir -p "$(dir $@)"
+	$(CC) $(OBJECTS) $(LDFLAGS) $(LDLIBS) -o $@
+	$(READELF) -h $@ > $(BUILDDIR)/elf-header.txt
+
+$(CRT0): exword/exword_crt0.s
+	@mkdir -p "$(dir $@)"
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(D01): $(ELF)
+	$(ELF2D01) -m $(TARGET) $< $@
+
+package: $(D01)
+	@for region in ja cn; do \
+		out="$(BUILDDIR)/$$region/$(APPID)"; \
+		mkdir -p "$$out"; \
+		cp "$(D01)" "$$out/$(APPMOD)"; \
+		for f in html/$$region/*.htm; do \
+			[ -e "$$f" ] || continue; \
+			sed -e 's/@APPTITLE/$(APPTITLE)/g' \
+			    -e 's/@APPID/$(APPID)/g' \
+			    -e 's/@APPMOD/$(APPMOD)/g' "$$f" > "$$out/$${f##*/}"; \
+		done; \
+		touch "$$out/fileinfo.cji"; \
+	done
+	@echo 'Experimental packages in $(BUILDDIR)/{ja,cn}/$(APPID)'
+
+diagnose:
+	@$(CC) -dumpmachine
+	@$(READELF) -h $(ELF)
+
+clean:
+	rm -rf $(BUILDDIR)
+
+-include $(DEPFILES)
