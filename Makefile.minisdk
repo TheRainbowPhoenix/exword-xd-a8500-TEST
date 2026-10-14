@@ -1,4 +1,4 @@
-# Compile EX-word XDTST with source-built SDK; no DEVKITPRO dependency.
+# Compile EX-word HEXED with source-built SDK; no DEVKITPRO dependency.
 .DEFAULT_GOAL := all
 CROSS_PREFIX ?= sh4a_nofpueb-elf-
 CC := $(CROSS_PREFIX)gcc
@@ -6,8 +6,8 @@ READELF := $(CROSS_PREFIX)readelf
 SDK_DIR ?= .mini-sdk
 SDK := $(abspath $(SDK_DIR))
 BUILDDIR := build-minisdk
-TARGET := xdtest
-APPID := XDTST
+TARGET := hexed
+APPID := HEXED
 ELF := $(BUILDDIR)/$(TARGET).elf
 D01 := $(BUILDDIR)/$(TARGET).d01
 CFILES := $(wildcard src/*.c src/libc/*.c)
@@ -37,11 +37,11 @@ $(D01): $(ELF)
 package: $(D01)
 	@for region in ja cn; do \
 		out="$(BUILDDIR)/$$region/$(APPID)"; \
-		mkdir -p "$$out"; cp "$(D01)" "$$out/xdtest.d01"; \
+		mkdir -p "$$out"; cp "$(D01)" "$$out/hexed.d01"; \
 		for f in html/$$region/*.htm; do \
 			[ -e "$$f" ] || continue; \
-			sed -e 's/@APPTITLE/XD-N8500 TEST/g' -e 's/@APPID/XDTST/g' \
-			    -e 's/@APPMOD/xdtest.d01/g' "$$f" > "$$out/$$(basename "$$f")"; \
+			sed -e 's/@APPTITLE/EX-WORD HEX EDITOR/g' -e 's/@APPID/HEXED/g' \
+			    -e 's/@APPMOD/hexed.d01/g' "$$f" > "$$out/$$(basename "$$f")"; \
 		done; touch "$$out/fileinfo.cji"; done
 clean:
 	rm -rf "$(BUILDDIR)"
