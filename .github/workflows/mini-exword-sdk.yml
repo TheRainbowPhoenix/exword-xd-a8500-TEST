@@ -40,7 +40,6 @@ jobs:
           docker run --rm --platform linux/amd64 \
             -v "$PWD:/work" -w /work --entrypoint /bin/bash \
             -e LIBDATAPLUS_REF \
-
             ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
             -ec 'git config --global --add safe.directory /work/.deps/elf2d01; export PATH=/toolchain/bin:$PATH; bash scripts/build-mini-sdk.sh'
 

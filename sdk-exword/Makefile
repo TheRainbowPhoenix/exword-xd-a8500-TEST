@@ -50,5 +50,5 @@ $(LIB)/libsh4a.a: $(SH_O)
 	@mkdir -p "$(LIB)"
 	$(AR) rcs $@ $(SH_O)
 clean:
-	rm -rf "$(DEST)"
+	rm -rf "$(OBJ)" "$(LIB)" "$(INC)"
 -include $(patsubst %.o,%.d,$(DP_O) $(GR_O) $(SH_O))
