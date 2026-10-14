@@ -19,9 +19,9 @@ OBJDUMP     := $(PREFIX)objdump
 READELF     := $(PREFIX)readelf
 ELF2D01     ?= $(DEVKITPRO)/tools/bin/elf2d01
 
-APPID       := XDTST
-APPTITLE    := XD-N8500 TEST
-TARGET      := xdtest
+APPID       := HEXED
+APPTITLE    := EX-WORD HEX EDITOR
+TARGET      := hexed
 APPMOD      := $(TARGET).d01
 BUILDDIR    := build-hollyhock
 ELF         := $(BUILDDIR)/$(TARGET).elf
