@@ -1,3 +1,28 @@
+# MEMBR — EX-word memory browser with OS/NOR view
+
+MEMBR runs using **the original devkitSH4 GCC and precompiled
+libdataplus** (your on-device test confirmed this toolchain works).
+
+The white-themed memory browser now supports read-only hex/ASCII views,
+8-digit Jump-to-address, and **S (own RAM), O (firmware/NOR),
+U (raw/unrestricted)** modes. The ordinary keyboard letter **J**
+opens Jump, in addition to the physical **ジャンプ / Jump Search** key
+(`KEY_JUMP = 74`).
+
+**Important:** The firmware/NOR mode checks `CASIODICS` headers at
+`0x8000FF80` and `0x8001FF80`, following
+[dictscript's NOR dumper](https://github.com/dictscript/dictscript/blob/main/softwares/run-on-dictionary/NOR_dumper/src/nor_dumper.c).
+That first *header check itself* can still reboot an incompatible
+device. It requires explicit confirmation. In RAM and verified NOR
+views, addresses outside the enabled region show `--`; RAW deliberately
+retains the older unbounded reads and their crash risk. No writes or
+file dumps are performed.
+
+[Download the Japanese/Chinese devkitSH4 builds](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/devkit-memory-browser.yml) ·
+[Full controls, firmware reference and safety notes](docs/devkit-memory-browser.md)
+
+---
+
 # HEXED — minimal EX-word hex editor
 
 Experimental **HEXED** editor for CASIO EX-word dictionaries, built using

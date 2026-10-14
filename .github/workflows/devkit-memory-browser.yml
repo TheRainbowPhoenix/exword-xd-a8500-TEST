@@ -1,0 +1,80 @@
+name: EXPERIMENT - Devkit memory browser (NOR-aware)
+
+on:
+  push:
+    branches: [experiment/devkit-unbounded-memory-browser]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build MEMBR with proven devkitSH4 and original libraries
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit-test address navigation and jump field (host)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            memory_browser/memory_browser.c tests/test_memory_browser.c \
+            -o /tmp/exword-memory-browser-unit
+          /tmp/exword-memory-browser-unit
+          cc -std=c11 -Wall -Wextra -Werror \
+            memory_browser/memory_regions.c tests/test_memory_regions.c \
+            -o /tmp/exword-memory-regions-unit
+          /tmp/exword-memory-regions-unit
+
+      - name: Install original devkitSH4 and original libdataplus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz \
+            | tar xzf - -C "$RUNNER_TEMP/original"
+          test -x "$RUNNER_TEMP/original/devkitPro/devkitSH4/bin/sh-elf-gcc"
+          test -s "$RUNNER_TEMP/original/devkitPro/libdataplus/lib/libgraphics.a"
+          test -x "$RUNNER_TEMP/original/devkitPro/tools/bin/elf2d01"
+
+      - name: Compile EX-word MEMBR add-on (original toolchain)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEVKITPRO="$RUNNER_TEMP/original/devkitPro"
+          export DEVKITSH4="$DEVKITPRO/devkitSH4"
+          export PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH"
+          sh-elf-gcc --version | head -n1
+          make -f Makefile.devkit-browser clean
+          make -f Makefile.devkit-browser app
+          for region in ja cn; do
+            test -s "build-devkit-memory/$region/MEMBR/membr.d01"
+            test -s "build-devkit-memory/$region/MEMBR/diction.htm"
+            test -f "build-devkit-memory/$region/MEMBR/fileinfo.cji"
+          done
+          cmp build-devkit-memory/ja/MEMBR/membr.d01 build-devkit-memory/cn/MEMBR/membr.d01
+          file membr.elf build-devkit-memory/ja/MEMBR/membr.d01
+          echo "Compiled with ORIGINAL devkitSH4 and precompiled libdataplus" >> "$GITHUB_STEP_SUMMARY"
+          echo "MEMBR starts in its own RAM and skips unknown addresses; opt-in NOR header probe and raw mode may still reboot hardware." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Japanese MEMBR ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-membr-devkit-ja
+          path: build-devkit-memory/ja/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+      - name: Upload Chinese MEMBR ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-membr-devkit-cn
+          path: build-devkit-memory/cn/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
