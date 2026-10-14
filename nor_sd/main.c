@@ -30,6 +30,19 @@ static const char * const paths32[] = {
     "\\\\crd0\\NOR32A.BIN", "\\\\crd0\\NOR32B.BIN"
 };
 static const char digits[] = "0123456789ABCDEF";
+static const char * const test_paths[] = {
+    "\\\\crd0\\SDTSTA.TXT", "\\\\crd0\\SDTSTB.TXT"
+};
+static const uint8_t test_bytes[16] = {
+    'E','X','W','O','R','D','-','S','D','-','T','E','S','T','0','1'
+};
+
+/* Diagnostics visible on the device, not only in the return value.
+ * errno-like codes are syscalls' signed integers cast to hex for display. */
+enum {
+    CHECK_OK=0, CHECK_OPEN=-1, CHECK_SIZE=-2, CHECK_READ=-3,
+    CHECK_CONTENT=-4, CHECK_CLOSE=-5
+};
 
 static void print_at(unsigned x, unsigned y, const char *str)
 {
@@ -81,12 +94,14 @@ static int poll_choice(void)
     keypad_read();
     if (key_state(KEY_ENTER)) current |= 1u;
     if (key_state(KEY_PAGE_DOWN)) current |= 2u;
+    if (key_state(KEY_CHAR_T)) current |= 8u;
     if (key_state(KEY_BACK) || key_state(KEY_POWER)) current |= 4u;
     pressed = current & ~previous;
     previous = current;
     if (pressed & 4u) return -1;
     if (pressed & 1u) return 16;
     if (pressed & 2u) return 32;
+    if (pressed & 8u) return 1;
     return 0;
 }
 
@@ -108,6 +123,116 @@ static int choose_existing_free_filename(const char * const names[2],
     return 0;
 }
 
+
+/* Confirm the device's own read syscall can reopen a newly written file.
+ * A verified size/readback does not guarantee libexword sees the same
+ * namespace, nor is it a cryptographic validation of the ROM image. */
+static int verify_file(const char *path, uint32_t expected,
+                       const uint8_t *prefix, unsigned prefix_size,
+                       uint32_t *actual_out, int *detail_out)
+{
+    uint8_t buf[16];
+    unsigned i;
+    int fd = sys_open(path, FILE_RD);
+    int actual, n, close_rc;
+
+    *actual_out = 0u;
+    *detail_out = fd;
+    if (fd < 0) return CHECK_OPEN;
+    actual = sys_get_filesize(fd);
+    *detail_out = actual;
+    if (actual >= 0) *actual_out = (uint32_t)actual;
+    if (actual < 0 || (uint32_t)actual != expected) {
+        sys_close(fd);
+        return CHECK_SIZE;
+    }
+
+    if (prefix_size > sizeof(buf)) {
+        sys_close(fd);
+        return CHECK_READ;
+    }
+    n = sys_read(fd, buf, (int)prefix_size);
+    *detail_out = n;
+    if (n != (int)prefix_size) {
+        sys_close(fd);
+        return CHECK_READ;
+    }
+    for (i = 0u; i < prefix_size; ++i) {
+        if (buf[i] != prefix[i]) {
+            *detail_out = (int)i;
+            sys_close(fd);
+            return CHECK_CONTENT;
+        }
+    }
+    close_rc = sys_close(fd);
+    *detail_out = close_rc;
+    return close_rc == 0 ? CHECK_OK : CHECK_CLOSE;
+}
+
+static void show_file_check(const char *path, int check,
+                            uint32_t actual, int detail)
+{
+    char bytes[9], rc[9];
+    hex8(bytes, actual);
+    hex8(rc, (uint32_t)detail);
+    if (check == CHECK_OK)
+        screen("FILE EXISTS / SIZE + PREFIX MATCH", path,
+               "SIZE HEX BYTES:", bytes);
+    else if (check == CHECK_OPEN)
+        screen("POST-WRITE REOPEN FAILED", path,
+               "OPEN RETURN (HEX):", rc);
+    else if (check == CHECK_SIZE)
+        screen("POST-WRITE SIZE MISMATCH", path,
+               "ACTUAL SIZE (HEX):", bytes);
+    else if (check == CHECK_READ)
+        screen("POST-WRITE READ FAILED", path,
+               "READ RETURN (HEX):", rc);
+    else if (check == CHECK_CONTENT)
+        screen("POST-WRITE DATA MISMATCH", path,
+               "BAD OFFSET (HEX):", rc);
+    else
+        screen("POST-WRITE CLOSE FAILED", path,
+               "CLOSE RETURN (HEX):", rc);
+}
+
+static void run_sd_probe(void)
+{
+    const char *name = 0;
+    unsigned long space = 0;
+    int fd, count, close_rc, check = 0, detail = 0;
+    uint32_t actual = 0u;
+
+    if (sys_freediskspace("crd0", &space) != 0 || space < 4096ul) {
+        screen("SD TEST: CRD0 NOT AVAILABLE", "No file created.",
+               "Check card, mount and free space.", "BACK: EXIT");
+        return;
+    }
+    if (!choose_existing_free_filename(test_paths, &name)) {
+        screen("SD TEST: CANNOT CREATE FILE", "SDTSTA / SDTSTB already used?",
+               "No existing file was deleted.", "BACK: EXIT");
+        return;
+    }
+    fd = sys_open(name, FILE_WR);
+    if (fd < 0) {
+        screen("SD TEST: OPEN FOR WRITE FAILED", name,
+               "Empty file may remain.", "BACK: EXIT");
+        return;
+    }
+    count = sys_write(fd, test_bytes, (int)sizeof(test_bytes));
+    close_rc = sys_close(fd);
+    if (count != (int)sizeof(test_bytes) || close_rc != 0) {
+        char val[9];
+        hex8(val, (uint32_t)(count != (int)sizeof(test_bytes) ? count : close_rc));
+        screen("SD TEST: WRITE OR CLOSE FAILED", name,
+               "RETURN VALUE (HEX):", val);
+        return;
+    }
+    check = verify_file(name, (uint32_t)sizeof(test_bytes),
+                        test_bytes, (unsigned)sizeof(test_bytes),
+                        &actual, &detail);
+    show_file_check(name, check, actual, detail);
+}
+
 static int dump_to_sd(uint32_t size)
 {
     const char *outname = 0;
@@ -117,6 +242,10 @@ static int dump_to_sd(uint32_t size)
     uint32_t next_progress = 0;
     int fd;
     int failure = 0;
+    int check_detail = 0;
+    uint32_t actual = 0u;
+    uint8_t prefix[16];
+    unsigned i;
     char cur[9], end[9];
 
     /* No SD card? or not enough free storage? Stop BEFORE creating a file.
@@ -190,9 +319,16 @@ static int dump_to_sd(uint32_t size)
         return -(10 + failure);
     }
 
-    screen("DUMP COMPLETED", "File saved to CRD0:", outname,
-           "COPY THE BIN FILE TO YOUR PC");
-    return 0;
+    /* Read back by path only after closing the write handle. This will
+     * reveal false positive "completed" reports where SD shows no file. */
+    for (i = 0u; i < sizeof(prefix); ++i)
+        prefix[i] = *(const volatile uint8_t *)(uintptr_t)(NOR_BASE + i);
+    {
+        int check = verify_file(outname, size, prefix, (unsigned)sizeof(prefix),
+                                &actual, &check_detail);
+        show_file_check(outname, check, actual, check_detail);
+        return check == CHECK_OK ? 0 : -20 + check;
+    }
 }
 
 int main(void)
@@ -206,7 +342,7 @@ int main(void)
     screen("CHOOSE ROM SIZE - SD CARD REQUIRED",
            "ENTER: 16 MiB (conservative)",
            "PAGE DOWN: 32 MiB (experimental)",
-           "BACK: EXIT WITHOUT WRITING");
+           "T: TINY SD FILE TEST / BACK: EXIT");
 
     for (;;) {
         volatile unsigned spin;
@@ -214,7 +350,10 @@ int main(void)
         if (step < 0) return -2;
         if (step != 0) {
             choice = step;
-            if (choice == 16)
+            if (choice == 1) {
+                screen("SD FILE WRITE/READBACK TEST", "WRITES 16 BYTES TO CRD0",
+                       "ENTER: CONFIRM TEST", "BACK: CANCEL");
+            } else if (choice == 16)
                 screen("CONFIRM 16 MiB NOR DUMP", "80000000 - 80FFFFFF",
                        "ENTER: WRITE NEW FILE TO CRD0",
                        "BACK: CANCEL");
@@ -241,8 +380,12 @@ int main(void)
         if (key_state(KEY_ENTER)) break;
         for (spin = 0u; spin < 10000u; ++spin) { }
     }
-    step = dump_to_sd(choice == 32 ? SIZE_32 : SIZE_16);
-    (void)step;
+    if (choice == 1)
+        run_sd_probe();
+    else {
+        step = dump_to_sd(choice == 32 ? SIZE_32 : SIZE_16);
+        (void)step;
+    }
 
     /* Keep result on screen until exit; don't hide errors automatically. */
     for (;;) {
