@@ -14,6 +14,9 @@ can compile and link this EX-word DATAPLUS add-on.
   [HHK3template](https://github.com/QBos07/HHK3template)).
 - EX-word-specific headers and static libraries: `libdataplus` from the
   historical [devkitSH4 distribution](https://github.com/MaxSignal/buildscripts).
+- EX-word startup + linker memory map: explicitly ported from devkitSH4's
+  `exword_crt0.s` and `exword.ld`, because **`-mexword` supplies these
+  automatically only with the patched original GCC**.
 - EX-word module packaging: historical `elf2d01`. A ClassPad `.hh3`
   is **not** an EX-word `.d01`.
 - Source: unmodified `src/` and `src/libc/` from this repository.
@@ -21,6 +24,9 @@ can compile and link this EX-word DATAPLUS add-on.
 The original devkitSH4 builds with the custom
 `sh-elf-gcc -mb -m3 -mexword -mrenesas`; hollyhock's SH4A big-endian
 toolchain is *not* guaranteed ABI-compatible with these older libraries.
+The CI should check for the module entry point and expected EX-word memory
+addresses; the original unpatched link incorrectly started at 0x8cff0000
+and had no `_start` symbol, so it was **not** runnable.
 A successful ELF link does **not** necessarily mean it is safe to run
 on the EX-word. Treat even successful artifacts as experimental until
 validated for ELF machine/endianness, static relocation, conversion and

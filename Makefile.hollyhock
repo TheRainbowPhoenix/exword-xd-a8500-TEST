@@ -5,6 +5,8 @@
 #
 # Usage: DEVKITPRO=/path/to/devkitPro make -f Makefile.hollyhock
 # Expects sh4a_nofpueb-elf-* tools on PATH.
+# exword/{exword.ld,exword_crt0.s} mirror the historical devkitSH4
+# files distributed by MaxSignal/buildscripts under the GNU toolchain terms.
 .DEFAULT_GOAL := all
 
 ifndef DEVKITPRO
@@ -28,15 +30,17 @@ D01         := $(BUILDDIR)/$(TARGET).d01
 LIBDATAPLUS := $(DEVKITPRO)/libdataplus
 CFILES      := $(wildcard src/*.c) $(wildcard src/libc/*.c)
 SFILES      := $(wildcard src/*.s) $(wildcard src/libc/*.s)
-OBJECTS     := $(addprefix $(BUILDDIR)/,$(CFILES:.c=.o) $(SFILES:.s=.o))
+CRT0        := $(BUILDDIR)/exword/exword_crt0.o
+OBJECTS     := $(CRT0) $(addprefix $(BUILDDIR)/,$(CFILES:.c=.o) $(SFILES:.s=.o))
 DEPFILES    := $(OBJECTS:.o=.d)
 
-# Use compiler default SH4A big-endian no-FPU architecture; unlike devkitSH4,
-# this compiler does not have the nonstandard -mexword flag.
+# Use compiler default SH4A big-endian no-FPU architecture. devkitSH4's
+# -mexword also supplies an EX-word linker script and startup stub; both are
+# now explicitly supplied in exword/ rather than relying on a default ELF link.
 CFLAGS      := -std=gnu17 -O2 -Wall -Wextra -ffreestanding -fno-builtin \
                -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP
 ASFLAGS     := -x assembler-with-cpp
-LDFLAGS     := -nostdlib -Wl,-Map,$(ELF).map -L$(LIBDATAPLUS)/lib
+LDFLAGS     := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(LIBDATAPLUS)/lib
 LDLIBS      := -ldataplus -lgraphics -lsh4a -lgcc
 
 .PHONY: all clean check-toolchain diagnose package
@@ -57,10 +61,14 @@ $(BUILDDIR)/%.o: %.s
 	@mkdir -p "$(dir $@)"
 	$(CC) $(ASFLAGS) -c $< -o $@
 
-$(ELF): $(OBJECTS)
+$(ELF): $(OBJECTS) exword/exword.ld
 	@mkdir -p "$(dir $@)"
 	$(CC) $(OBJECTS) $(LDFLAGS) $(LDLIBS) -o $@
 	$(READELF) -h $@ > $(BUILDDIR)/elf-header.txt
+
+$(CRT0): exword/exword_crt0.s
+	@mkdir -p "$(dir $@)"
+	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(D01): $(ELF)
 	$(ELF2D01) -m $(TARGET) $< $@
