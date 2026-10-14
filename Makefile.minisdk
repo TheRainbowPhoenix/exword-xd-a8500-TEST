@@ -37,7 +37,7 @@ $(ELF): $(OBJECTS) exword/exword.ld
 $(D01): $(ELF)
 	$(SDK)/bin/elf2d01 -m $(TARGET) $< $@
 package: $(D01)
-	@for region in ja cn; do \
+	@set -e; for region in ja cn; do \
 		out="$(BUILDDIR)/$$region/$(APPID)"; \
 		mkdir -p "$$out"; cp "$(D01)" "$out/$(TARGET).d01"; \
 		for f in html/$$region/*.htm; do \
