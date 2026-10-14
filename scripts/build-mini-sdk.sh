@@ -14,6 +14,10 @@ fetch() {
 fetch https://github.com/brijohn/libdataplus.git "$LIBDATAPLUS_COMMIT" .deps/libdataplus
 fetch https://github.com/brijohn/elf2d01.git "$ELF2D01_COMMIT" .deps/elf2d01
 # Native converter from upstream C source, not from MaxSignal.
-cc -O2 -Wall -Wextra .deps/elf2d01/elf2d01.c -o .mini-sdk/bin/elf2d01
+# Host-native elf2d01 is compiled on the runner, where host C compiler exists.
+if [ ! -x .mini-sdk/bin/elf2d01 ]; then
+  command -v cc >/dev/null || { echo "Missing native .mini-sdk/bin/elf2d01; compile with host cc first" >&2; exit 1; }
+  cc -O2 -Wall -Wextra .deps/elf2d01/elf2d01.c -o .mini-sdk/bin/elf2d01
+fi
 make -f sdk-exword/Makefile LIBDATAPLUS_SRC=.deps/libdataplus SDK_DIR=.mini-sdk -j2 all
 make -f Makefile.minisdk SDK_DIR=.mini-sdk all
