@@ -1,0 +1,48 @@
+# MEMBR: real 32-bit memory browser, original devkitSH4 + original libdataplus.
+# This is intentionally INDEPENDENT of the crash-prone Hollyhock route.
+.SUFFIXES:
+.DEFAULT_GOAL := app
+
+ifeq ($(strip $(DEVKITSH4)),)
+$(error Set DEVKITSH4 to original devkitPro/devkitSH4)
+endif
+include $(DEVKITSH4)/exword_rules
+
+TARGET      := membr
+MODNAME     := membr
+APPTITLE    := EX-WORD MEMORY BROWSER
+APPID       := MEMBR
+APPMOD      := $(TARGET).d01
+BUILDS      := ja cn
+HTMLDIR     := html
+CFILES      := $(wildcard memory_browser/*.c) $(wildcard src/libc/*.c)
+SFILES      := $(wildcard memory_browser/*.s) $(wildcard src/libc/*.s)
+OBJECTS     := $(CFILES:.c=.o) $(SFILES:.s=.o)
+
+# Match the working DVLLO/DVGRD legacy compile/link flags and runtime.
+CC_OPTS     :=
+LDFLAGS     := -Wall -std=gnu17 -nostdlib -L$(DEVKITPRO)/libdataplus/lib -ldataplus -lgraphics -lsh4a
+CFLAGS      := -Wall -std=gnu17 -fno-builtin \
+               -I$(DEVKITPRO)/libdataplus/include \
+               -Imemory_browser -Isrc/libc/include -O3 $(CC_OPTS)
+ASFLAGS     := -Wall -std=gnu17 -m4-nofpu
+
+.PHONY: app clean
+app: $(addprefix build-devkit-memory/,$(addsuffix /$(APPID),$(BUILDS)))
+
+.SECONDEXPANSION:
+build-devkit-memory/%/$(APPID): $(TARGET).d01 $$(wildcard $(HTMLDIR)/$$*/*.htm)
+	@echo "Packaging $(APPID) for $*"
+	@mkdir -p $@
+	@cp $(TARGET).d01 $@/$(APPMOD)
+	@set -e; for f in $(HTMLDIR)/$*/*.htm; do \
+		sed -e 's/@APPTITLE/$(APPTITLE)/g' \
+		    -e 's/@APPID/$(APPID)/g' \
+		    -e 's/@APPMOD/$(APPMOD)/g' "$$f" > "$@/$$(basename "$$f")"; \
+	done
+	@touch $@/fileinfo.cji
+
+$(TARGET).elf: $(OBJECTS)
+
+clean:
+	@rm -rf build-devkit-memory $(OBJECTS) $(TARGET).elf $(TARGET).elf.map $(TARGET).d01
