@@ -1,0 +1,43 @@
+# NORSD: legacy devkitSH4 GCC and original libdataplus only.
+.SUFFIXES:
+.DEFAULT_GOAL := app
+
+ifeq ($(strip $(DEVKITSH4)),)
+$(error Set DEVKITSH4 to the original SDK)
+endif
+include $(DEVKITSH4)/exword_rules
+
+TARGET      := norsd
+MODNAME     := norsd
+APPID       := NORSD
+APPTITLE    := EX-WORD NOR TO SD
+APPMOD      := $(TARGET).d01
+BUILDS      := ja cn
+HTMLDIR     := html
+CFILES      := nor_sd/main.c $(wildcard src/libc/*.c)
+SFILES      := $(wildcard src/libc/*.s)
+OBJECTS     := $(CFILES:.c=.o) $(SFILES:.s=.o)
+
+LDFLAGS     := -Wall -std=gnu17 -nostdlib -L$(DEVKITPRO)/libdataplus/lib -ldataplus -lgraphics -lsh4a
+CFLAGS      := -Wall -Wextra -std=gnu17 -fno-builtin -I$(DEVKITPRO)/libdataplus/include -Isrc/libc/include -O2
+ASFLAGS     := -Wall -std=gnu17 -m4-nofpu
+
+.PHONY: app clean
+.SECONDARY: $(TARGET).d01
+app: $(addprefix build-nor-sd/,$(addsuffix /$(APPID),$(BUILDS)))
+
+.SECONDEXPANSION:
+build-nor-sd/%/$(APPID): $(TARGET).d01 $$(wildcard $(HTMLDIR)/$$*/*.htm)
+	@mkdir -p "$@"
+	@cp $(TARGET).d01 "$@/$(APPMOD)"
+	@set -e; for f in $(HTMLDIR)/$*/*.htm; do \
+		sed -e 's/@APPTITLE/$(APPTITLE)/g' \
+		    -e 's/@APPID/$(APPID)/g' \
+		    -e 's/@APPMOD/$(APPMOD)/g' "$$f" > "$@/$$(basename "$$f")"; \
+	done
+	@touch "$@/fileinfo.cji"
+
+$(TARGET).elf: $(OBJECTS)
+
+clean:
+	@rm -rf build-nor-sd $(OBJECTS) $(TARGET).elf $(TARGET).elf.map $(TARGET).d01
