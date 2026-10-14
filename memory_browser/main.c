@@ -14,6 +14,7 @@
 #include <graphics/text.h>
 #include <sh4a/input/keypad.h>
 #include "memory_browser.h"
+#include "memory_regions.h"
 
 #define SCREEN_W 528u
 #define SCREEN_H 320u
@@ -26,6 +27,11 @@
 
 static const char hexdigits[] = "0123456789ABCDEF";
 static MemoryBrowser browser;
+static MBRegions regions;
+static MBView view = MB_VIEW_SCRATCH;
+enum { PENDING_NONE=0, PENDING_NOR=1, PENDING_RAW=2 };
+static int pending = PENDING_NONE;
+static int nor_header_missing = 0;
 /* First displayed page is a known, ordinary app-allocated RAM object.
  * 128-byte alignment prevents the first page from preceding the allocation. */
 static uint8_t demonstration[512] __attribute__((aligned(128)));
@@ -41,6 +47,7 @@ enum {
     B_HEX0, B_HEX1, B_HEX2, B_HEX3, B_HEX4,
     B_HEX5, B_HEX6, B_HEX7, B_HEX8, B_HEX9,
     B_HEXA, B_HEXB, B_HEXC, B_HEXD, B_HEXE, B_HEXF,
+    B_SCRATCH, B_NOR, B_RAW, B_JALT,
     B_COUNT
 };
 
@@ -49,7 +56,8 @@ static const uint8_t key_codes[B_COUNT] = {
     KEY_JUMP, KEY_ENTER, KEY_BACK, KEY_POWER, KEY_BACKSPACE,
     KEY_CHAR_Q, KEY_CHAR_W, KEY_CHAR_E, KEY_CHAR_R, KEY_CHAR_T,
     KEY_CHAR_Y, KEY_CHAR_U, KEY_CHAR_I, KEY_CHAR_O, KEY_CHAR_P,
-    KEY_CHAR_A, KEY_CHAR_B, KEY_CHAR_C, KEY_CHAR_D, KEY_CHAR_E, KEY_CHAR_F
+    KEY_CHAR_A, KEY_CHAR_B, KEY_CHAR_C, KEY_CHAR_D, KEY_CHAR_E, KEY_CHAR_F,
+    KEY_CHAR_S, KEY_CHAR_O, KEY_CHAR_U, KEY_CHAR_J
 };
 
 static uint32_t key_snapshot(void)
@@ -85,13 +93,38 @@ static void fill_demo(void)
         demonstration[16u + i] = (uint8_t)label[i];
 }
 
-/* Every grid access is a byte read at the exact requested 32-bit address.
- * There is NO whitelist, caching, range check, probing, or fault recovery.
- * This is intentional per the experimental use case. */
-static uint8_t read_volatile_byte(uint32_t address)
+/* SH4 address errors cannot be caught by this add-on. */
+static uint8_t raw_byte(uint32_t address)
 {
     const volatile uint8_t *p = (const volatile uint8_t *)(uintptr_t)address;
     return *p;
+}
+
+static int read_byte(uint32_t address, uint8_t *out)
+{
+    if (!mb_regions_can_read(&regions, view, address))
+        return 0;
+    *out = raw_byte(address);
+    return 1;
+}
+
+/* The dictscript NOR dumper probes these two firmware-header locations.
+ * The probe is explicitly user-triggered, as it can still reboot on an
+ * unsupported model, even though the actual read is only 24 bytes. */
+static int probe_nor(uint32_t *size_out)
+{
+    static const uint32_t locations[2] = {
+        MB_NOR_HEADER_1, MB_NOR_HEADER_2
+    };
+    unsigned i, n;
+    for (i = 0u; i < 2u; ++i) {
+        uint8_t header[24];
+        for (n = 0u; n < sizeof(header); ++n)
+            header[n] = raw_byte(locations[i] + n);
+        if (mb_nor_header_parse(header, size_out))
+            return 1;
+    }
+    return 0;
 }
 
 static void draw_page(void)
@@ -107,10 +140,37 @@ static void draw_page(void)
     set_pen(background);
     draw_rect(0, 0, SCREEN_W, SCREEN_H);
 
+    if (pending != PENDING_NONE) {
+        set_pen(ink);
+        text_at(16, 30, "CONFIRM EX-WORD MEMORY OPERATION");
+        set_pen(soft);
+        if (pending == PENDING_NOR) {
+            text_at(16, 66, "PROBE NOR / OS HEADER (DICTSCRIPT)");
+            text_at(16, 96, "Reads 8000FF80 and maybe 8001FF80");
+            text_at(16, 126, "UNMAPPED HEADER MAY STILL REBOOT!");
+        } else {
+            text_at(16, 66, "ENABLE UNRESTRICTED RAW READS");
+            text_at(16, 96, "No mapping checks or exception recovery");
+            text_at(16, 126, "ANY INVALID ADDRESS CAN REBOOT!");
+        }
+        set_pen(ink);
+        text_at(16, 188, "ENTER = CONFIRM");
+        text_at(16, 217, "BACK  = CANCEL");
+        lcdc_copy_vram();
+        return;
+    }
+
     set_pen(ink);
-    text_at(12, 7, "MEMBR  /  RAW MEMORY VIEW  /  READ ONLY");
+    text_at(12, 7, "MEMBR / LIVE HEX + ASCII / READ-ONLY");
     set_pen(soft);
-    text_at(12, 24, "ANY 32-BIT ADDRESS - INVALID READ MAY REBOOT");
+    if (view == MB_VIEW_NOR)
+        text_at(12, 24, "NOR OS VIEW - HEADER VERIFIED (MODEL-DEPENDENT)");
+    else if (view == MB_VIEW_RAW)
+        text_at(12, 24, "RAW UNBOUNDED - INVALID READ CAN REBOOT");
+    else if (nor_header_missing)
+        text_at(12, 24, "OWN RAM ONLY - CASIODICS HEADER NOT FOUND");
+    else
+        text_at(12, 24, "OWN RAM ONLY - S=RAM O=OS U=RAW J=JUMP");
     set_pen(rule);
     draw_rect(10, 44, SCREEN_W - 20u, 1u);
 
@@ -127,16 +187,22 @@ static void draw_page(void)
 
         for (col = 0; col < MB_COLUMNS; ++col) {
             uint32_t addr = row_addr + col;
-            uint8_t value = read_volatile_byte(addr);
-            hexrow[col * 3u] = hexdigits[(value >> 4) & 15u];
-            hexrow[col * 3u + 1u] = hexdigits[value & 15u];
+            uint8_t value = 0u;
+            if (read_byte(addr, &value)) {
+                hexrow[col * 3u] = hexdigits[(value >> 4) & 15u];
+                hexrow[col * 3u + 1u] = hexdigits[value & 15u];
+                asciirow[col] = (value >= 32u && value <= 126u) ? (char)value : '.';
+            } else {
+                hexrow[col * 3u] = '-';
+                hexrow[col * 3u + 1u] = '-';
+                asciirow[col] = ' ';
+            }
             hexrow[col * 3u + 2u] = ' ';
-            asciirow[col] = (value >= 32u && value <= 126u) ? (char)value : '.';
         }
         hexrow[MB_COLUMNS * 3u] = 0;
         asciirow[MB_COLUMNS] = 0;
 
-        if (browser.address >= row_addr && browser.address < row_addr + MB_COLUMNS) {
+        if ((browser.address - row_addr) < MB_COLUMNS) {
             unsigned selected = browser.address - row_addr;
             set_pen(selection);
             draw_rect((uint16_t)(HEX_LEFT - 1u + selected * HEX_STRIDE), (uint16_t)(y - 1u), 19u, 13u);
@@ -163,21 +229,25 @@ static void draw_page(void)
         text_at(12, 288, "JUMP: 0x");
         text_at(76, 288, target);
         set_pen(soft);
-        text_at(12, 304, "Q-P=0-9 A-F=HEX  LR DIGIT  ENTER GO  BACK NO");
+        text_at(12, 304, "Q-P=0-9 A-F=HEX LR=NIBBLE ENTER=GO BACK=NO");
     } else {
-        char status[48] = "AT 0x00000000  BYTE=00   JUMP KEY TO GOTO";
-        uint8_t current = read_volatile_byte(browser.address);
+        uint8_t current = 0u;
+        int readable = read_byte(browser.address, &current);
         format_hex(haddr, browser.address, 8u);
-        format_hex(hvalue, current, 2u);
-        {
-            unsigned i;
-            for (i = 0; i < 8u; ++i) status[5u + i] = haddr[i];
-            for (i = 0; i < 2u; ++i) status[20u + i] = hvalue[i];
+        if (readable)
+            format_hex(hvalue, current, 2u);
+        else {
+            hvalue[0] = '-';
+            hvalue[1] = '-';
+            hvalue[2] = 0;
         }
         set_pen(ink);
-        text_at(12, 288, status);
+        text_at(12, 288, "AT 0x");
+        text_at(52, 288, haddr);
+        text_at(170, 288, "BYTE:");
+        text_at(222, 288, hvalue);
         set_pen(soft);
-        text_at(12, 304, "ARROWS MOVE  PAGE UP/DOWN  JUMP  BACK EXIT");
+        text_at(12, 304, "J / JUMP:GOTO   S:RAM   O:OS   U:RAW  BACK:EXIT");
     }
 
     lcdc_copy_vram();
@@ -196,6 +266,33 @@ static int handle_key_press(uint32_t pressed)
 {
     if (pressed & ((uint32_t)1u << B_POWER))
         return -1;
+
+    if (pending != PENDING_NONE) {
+        int choice = pending;
+        pending = PENDING_NONE;
+        if (pressed & ((uint32_t)1u << B_BACK))
+            return 1;
+        if (!(pressed & ((uint32_t)1u << B_ENTER))) {
+            pending = choice;
+            return 0;
+        }
+        if (choice == PENDING_NOR) {
+            uint32_t nor_size = 0u;
+            if (probe_nor(&nor_size)) {
+                regions.nor_size = nor_size;
+                view = MB_VIEW_NOR;
+                mb_init(&browser, MB_NOR_BASE);
+                nor_header_missing = 0;
+            } else {
+                view = MB_VIEW_SCRATCH;
+                mb_init(&browser, (uint32_t)(uintptr_t)&demonstration[0]);
+                nor_header_missing = 1;
+            }
+        } else {
+            view = MB_VIEW_RAW;
+        }
+        return 1;
+    }
 
     if (browser.jumping) {
         int digit;
@@ -222,8 +319,22 @@ static int handle_key_press(uint32_t pressed)
 
     if (pressed & ((uint32_t)1u << B_BACK))
         return -1;
-    if (pressed & ((uint32_t)1u << B_JUMP))
+    if (pressed & ((uint32_t)1u << B_SCRATCH)) {
+        view = MB_VIEW_SCRATCH;
+        mb_init(&browser, (uint32_t)(uintptr_t)&demonstration[0]);
+    } else if (pressed & ((uint32_t)1u << B_NOR)) {
+        if (regions.nor_size != 0u) {
+            view = MB_VIEW_NOR;
+            mb_init(&browser, MB_NOR_BASE);
+        } else {
+            pending = PENDING_NOR;
+        }
+    } else if (pressed & ((uint32_t)1u << B_RAW)) {
+        pending = PENDING_RAW;
+    } else if (pressed & (((uint32_t)1u << B_JUMP) |
+                          ((uint32_t)1u << B_JALT))) {
         mb_open_jump(&browser);
+    }
     else if (pressed & ((uint32_t)1u << B_LEFT))
         mb_move(&browser, -1);
     else if (pressed & ((uint32_t)1u << B_RIGHT))
@@ -246,6 +357,10 @@ int main(void)
     (void)font;
 
     fill_demo();
+    mb_regions_init(&regions, (uint32_t)(uintptr_t)&demonstration[0],
+                    (uint32_t)sizeof(demonstration));
+    view = MB_VIEW_SCRATCH;
+    pending = PENDING_NONE;
     mb_init(&browser, (uint32_t)(uintptr_t)&demonstration[0]);
     draw_page();
 
