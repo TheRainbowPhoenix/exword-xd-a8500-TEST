@@ -38,7 +38,7 @@ DEPFILES    := $(OBJECTS:.o=.d)
 # -mexword also supplies an EX-word linker script and startup stub; both are
 # now explicitly supplied in exword/ rather than relying on a default ELF link.
 CFLAGS      := -std=gnu17 -O2 -Wall -Wextra -ffreestanding -fno-builtin \
-               -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP
+               -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP $(EXTRA_CFLAGS)
 ASFLAGS     := -x assembler-with-cpp
 LDFLAGS     := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(LIBDATAPLUS)/lib
 LDLIBS      := -ldataplus -lgraphics -lsh4a -lgcc
