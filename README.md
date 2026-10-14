@@ -7,6 +7,36 @@ by [CPHexEditor for HHK3](https://github.com/PyCSharp/CPHexEditor-For-HHK3),
 but this is a new EX-word-native C implementation; it does not require
 Hollyhock 3 ClassPad symbols.
 
+## Crash investigation (hardware feedback)
+
+**A user reports that the current HEXED binary makes their EX-word reboot.**
+A green Actions build does not mean the binary is safe to run.
+**Do not launch the main HEXED app again until the crash is isolated.**
+
+The mini-SDK workflow now builds two separate diagnostic apps:
+
+- **HXHEL** (hello probe): only clears/draws a few lines and polls
+  Back/Power with `get_key_state`, matching common EX-word examples.
+- **HXGRD** (grid probe): draws 16 rows of hexadecimal-like text, without
+  touching the editor buffer or calling `get_key_pressed`.
+
+Do not install both at once if the device has limited add-on space. Start
+with HXHEL, and proceed to HXGRD only if HXHEL launches and exits normally.
+If HXHEL also triggers a reboot, suspect startup/ABI/MMIO/device compatibility
+rather than the HEXED editing logic. Do not keep re-running a crashing probe.
+
+These are **not guaranteed safe** just because they are smaller. Report
+whether the crash happens immediately, before any text appears, after
+text appears, or only after pressing a key. Such information will help
+locate the failing subsystem.
+
+For device-specific work, see
+[EX-word RAM Scanner](https://github.com/ToTo-40417/exword-ram-scanner#english)
+(its tested RAM range applies to XD-N6500 only), and
+[EXplorer](https://github.com/brain-hackers/EXplorer) /
+[faketerminal](https://github.com/yukkuri-Dev/faketerminal), which demonstrate
+EX-word UI and file operations on supported hardware.
+
 ## Safe first prototype
 
 The editor contains a **512-byte scratch-RAM buffer** initialized with a
