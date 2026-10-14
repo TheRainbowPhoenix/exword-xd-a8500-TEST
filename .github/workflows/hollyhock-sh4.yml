@@ -1,0 +1,63 @@
+name: EXPERIMENT - Hollyhock SH4 compiler
+
+on:
+  push:
+    branches:
+      - experiment/hollyhock-sh4-cross
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hollyhock-sh4:
+    name: Test sh4a_nofpueb-elf-gcc with libdataplus
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Obtain EX-word-only SDK libraries and elf2d01
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/legacy"
+          curl -fsSL --retry 3 https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz \
+            | tar -xzf - -C "$RUNNER_TEMP/legacy"
+          test -x "$RUNNER_TEMP/legacy/devkitPro/tools/bin/elf2d01"
+          test -f "$RUNNER_TEMP/legacy/devkitPro/libdataplus/include/graphics/drawing.h"
+
+      - name: Compile using Hollyhock 3 Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" \
+            -v "$RUNNER_TEMP/legacy/devkitPro:/legacy/devkitPro:ro" \
+            -w /work \
+            -e DEVKITPRO=/legacy/devkitPro \
+            --entrypoint /bin/sh \
+            ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
+            -ec 'export PATH=/toolchain/bin:$PATH; make -f Makefile.hollyhock all'
+
+      - name: Verify D01 and both packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          file build-hollyhock/xdtest.elf build-hollyhock/xdtest.d01
+          for region in ja cn; do
+            test -s "build-hollyhock/$region/XDTST/xdtest.d01"
+            test -f "build-hollyhock/$region/XDTST/diction.htm"
+          done
+
+      - name: Upload experimental EX-word packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-xd-a8500-hollyhock-experimental
+          path: |
+            build-hollyhock/ja/
+            build-hollyhock/cn/
+            build-hollyhock/elf-header.txt
+          if-no-files-found: error
+          retention-days: 14
