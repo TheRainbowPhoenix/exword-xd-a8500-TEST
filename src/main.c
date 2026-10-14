@@ -101,7 +101,9 @@ static void draw_screen(void)
     {
         char info[] = "OFFSET: 0000    VALUE: 00    PAGE: 0000";
         hex_text(&info[8], editor.cursor, 4);
+        info[12] = ' ';
         hex_text(&info[23], editor.bytes[editor.cursor], 2);
+        info[25] = ' ';
         hex_text(&info[35], page, 4);
         set_pen(accent);
         draw_rect(12, 287, WIDTH - 24u, 1);
@@ -109,7 +111,7 @@ static void draw_screen(void)
     }
 
     set_pen(muted);
-    draw_text(14, 307, "ARROWS MOVE  PG PAGE  ENTER +/- BACKSP  SHIFT X16");
+    draw_text(14, 307, "ARROWS MOVE  PG PAGE  ENTER +  BKSP -  SHIFT X16");
     lcdc_copy_vram();
 }
 
