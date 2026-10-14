@@ -1,0 +1,48 @@
+# Compile EX-word XDTST with source-built SDK; no DEVKITPRO dependency.
+.DEFAULT_GOAL := all
+CROSS_PREFIX ?= sh4a_nofpueb-elf-
+CC := $(CROSS_PREFIX)gcc
+READELF := $(CROSS_PREFIX)readelf
+SDK_DIR ?= .mini-sdk
+SDK := $(abspath $(SDK_DIR))
+BUILDDIR := build-minisdk
+TARGET := xdtest
+APPID := XDTST
+ELF := $(BUILDDIR)/$(TARGET).elf
+D01 := $(BUILDDIR)/$(TARGET).d01
+CFILES := $(wildcard src/*.c src/libc/*.c)
+SFILES := $(wildcard src/*.s src/libc/*.s)
+OBJECTS := $(BUILDDIR)/exword/exword_crt0.o $(patsubst %.c,$(BUILDDIR)/%.o,$(CFILES)) $(patsubst %.s,$(BUILDDIR)/%.o,$(SFILES))
+CFLAGS := -std=gnu17 -O2 -ffreestanding -fno-builtin -Wall -Wextra -I$(SDK)/include -Isrc -Isrc/libc/include -MMD -MP
+LDFLAGS := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(SDK)/lib
+LIBS := -ldataplus -lgraphics -lsh4a -lgcc
+.PHONY: all clean check package
+all: check package
+check:
+	@test -f "$(SDK)/include/graphics/drawing.h" || { echo "Build SDK first" >&2; exit 1; }
+	@test -s "$(SDK)/lib/libgraphics.a"
+	@test -x "$(SDK)/bin/elf2d01"
+$(BUILDDIR)/%.o: %.c
+	@mkdir -p "$(dir $@)"
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILDDIR)/%.o: %.s
+	@mkdir -p "$(dir $@)"
+	$(CC) -x assembler-with-cpp -c $< -o $@
+$(ELF): $(OBJECTS) exword/exword.ld
+	$(CC) $(OBJECTS) $(LDFLAGS) $(LIBS) -o $@
+	$(READELF) -h $@ > $(BUILDDIR)/elf-header.txt
+	@grep -Eq 'Entry point address:[[:space:]]+0x70000080' $(BUILDDIR)/elf-header.txt
+$(D01): $(ELF)
+	$(SDK)/bin/elf2d01 -m $(TARGET) $< $@
+package: $(D01)
+	@for region in ja cn; do \
+		out="$(BUILDDIR)/$$region/$(APPID)"; \
+		mkdir -p "$$out"; cp "$(D01)" "$$out/xdtest.d01"; \
+		for f in html/$$region/*.htm; do \
+			[ -e "$$f" ] || continue; \
+			sed -e 's/@APPTITLE/XD-N8500 TEST/g' -e 's/@APPID/XDTST/g' \
+			    -e 's/@APPMOD/xdtest.d01/g' "$$f" > "$$out/$$(basename "$$f")"; \
+		done; touch "$$out/fileinfo.cji"; done
+clean:
+	rm -rf "$(BUILDDIR)"
+-include $(OBJECTS:.o=.d)
