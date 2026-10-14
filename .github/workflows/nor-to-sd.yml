@@ -1,0 +1,64 @@
+name: EXPERIMENT - NOR to SD dumper (devkitSH4)
+
+on:
+  push:
+    branches: [experiment/nor-to-crd0-dumper]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nor-sd:
+    name: Build NORSD with original devkitSH4 and libdataplus
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare original devkitSH4 and libdataplus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/devkit"
+          curl -fsSL --retry 3 \
+            https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz \
+            | tar xzf - -C "$RUNNER_TEMP/devkit"
+          test -x "$RUNNER_TEMP/devkit/devkitPro/devkitSH4/bin/sh-elf-gcc"
+          test -s "$RUNNER_TEMP/devkit/devkitPro/libdataplus/lib/libdataplus.a"
+
+      - name: Compile and inspect NORSD add-on packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEVKITPRO="$RUNNER_TEMP/devkit/devkitPro"
+          export DEVKITSH4="$DEVKITPRO/devkitSH4"
+          export PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH"
+          sh-elf-gcc --version | head -1
+          make -f Makefile.nor-sd clean
+          make -f Makefile.nor-sd app
+          for region in ja cn; do
+            test -s "build-nor-sd/$region/NORSD/norsd.d01"
+            test -s "build-nor-sd/$region/NORSD/diction.htm"
+            test -f "build-nor-sd/$region/NORSD/fileinfo.cji"
+            grep -Fl 'norsd.d01' "build-nor-sd/$region/NORSD"/inf*.htm
+          done
+          cmp build-nor-sd/ja/NORSD/norsd.d01 build-nor-sd/cn/NORSD/norsd.d01
+          file norsd.elf build-nor-sd/ja/NORSD/norsd.d01
+          echo "Build only: SD filesystem and chosen ROM mapping are hardware-unverified." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exword-norsd-ja
+          path: build-nor-sd/ja/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exword-norsd-cn
+          path: build-nor-sd/cn/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true

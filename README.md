@@ -1,3 +1,33 @@
+# NORSD — small EX-word NOR-to-SD dumper
+
+**Updated NORSD diagnostic:** The original binary could report DUMP
+COMPLETED without readback verification. The latest NORSD now has an
+optional **T → Enter** 16-byte SD file test; test that first if a full
+dump wasn't visible through libexword. It reopens saved files, checks
+their actual sizes and reads back the initial bytes.
+[SD diagnosis and full notes](docs/nor-to-sd.md).
+
+
+**NEW:** [NORSD](docs/nor-to-sd.md) writes a read-only image of the mapped
+NOR window to an ordinary file on the **removable SD/TF card (crd0)**.
+It's compiled with the original devkitSH4 GCC and original precompiled
+libdataplus. This version doesn't require a CASIODICS header because the
+target model didn't show the signature at the first expected location.
+
+The add-on **NORSD** lets you select **16 MiB (Enter)** or an
+**experimental 32 MiB (Page Down)** and requires a second confirmation.
+It checks SD free space, writes in 4 KiB chunks, avoids overwriting
+prior files (NOR16A/B.BIN or NOR32A/B.BIN), and never writes to flash.
+
+**Caution:** The 16/32 MiB lengths are chosen by the operator, not
+automatically validated NOR sizes. Reading beyond mapped ROM may
+hang or reboot the device. Test on a disposable SD card and preserve
+existing data. There is no hardware test yet.
+
+[Download Japanese/Chinese packages from NORSD GitHub Actions](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/nor-to-sd.yml).
+
+---
+
 # MEMBR — EX-word memory browser with OS/NOR view
 
 MEMBR runs using **the original devkitSH4 GCC and precompiled
