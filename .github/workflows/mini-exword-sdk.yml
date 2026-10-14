@@ -50,6 +50,21 @@ jobs:
             ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
             -ec 'git config --global --add safe.directory /work/.deps/elf2d01; export PATH=/toolchain/bin:$PATH; bash scripts/build-mini-sdk.sh'
 
+      - name: Build isolated EX-word diagnostic probes
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" -w /work --entrypoint /bin/bash \
+            ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
+            -ec 'export PATH=/toolchain/bin:$PATH; bash scripts/build-diagnostic-probes.sh'
+          for variant in hello/HXHEL/hxhel grid/HXGRD/hxgrd; do
+            IFS=/ read -r build id executable <<< "$variant"
+            for region in ja cn; do
+              test -s "build-probes/$build/$region/$id/$executable.d01"
+              test -s "build-probes/$build/$region/$id/diction.htm"
+            done
+          done
+
       - name: Validate executable, libraries and EX-word packages
         run: |
           set -euo pipefail
@@ -86,3 +101,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           overwrite: true
+
+      - name: Upload minimal hello display probe (HXHEL)
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-diagnostic-hxhel
+          path: |
+            build-probes/hello/ja/
+            build-probes/hello/cn/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      - name: Upload hex-like grid probe (HXGRD)
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-diagnostic-hxgrd
+          path: |
+            build-probes/grid/ja/
+            build-probes/grid/cn/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
