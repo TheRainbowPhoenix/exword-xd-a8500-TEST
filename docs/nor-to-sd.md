@@ -5,6 +5,35 @@ the **original patched devkitSH4 GCC and original precompiled libdataplus**.
 That compiler/library combination is the one that successfully ran your
 DVLLO, DVGRD and MEMBR experiments. It does not use Hollyhock GCC.
 
+## New: validate crd0 using a 16-byte test (before NOR dumping)
+
+The previous NORSD version could display **DUMP COMPLETED** because all
+`sys_write` calls returned a positive count and `sys_close` succeeded,
+**without reopening the destination**. A user reported that `NOR16A.BIN`
+did not appear in libexword `sd:///` despite that screen.
+
+NORSD now offers **T** on the first screen. After Enter confirmation it:
+1. Uses the EX-word's `sys_freediskspace("crd0", ...)`.
+2. Creates a **new** tiny `\\crd0\SDTSTA.TXT` or `SDTSTB.TXT` file.
+3. Writes 16 known bytes: `EXWORD-SD-TEST01`.
+4. Closes the file, **reopens it through `sys_open`**, checks its size
+   using `sys_get_filesize`, reads the contents with `sys_read`, and
+   checks all 16 bytes. The screen shows the failed stage, if any.
+5. Preserves existing files and partial test results (no deletion).
+
+**Test this first instead of generating another 16 MiB dump.** If it
+reports success, reconnect libexword, `setpath sd:///`, and try
+`get SDTSTA.TXT` even if `list` doesn't display it. Also check the
+physical SD card directly on a PC/card reader when possible.
+
+Full NOR dumping now checks that the output `NOR16A/B.BIN` or
+`NOR32A/B.BIN` file can be reopened after closing, has exactly the
+expected size, and that its first 16 bytes match the mapped ROM.
+A **DUMP COMPLETED**-equivalent message is no longer shown without
+this minimal readback. Successful readback on-device still does not
+guarantee visibility in the libexword USB listing: those may be separate
+filesystem views or cached directories.
+
 ## What it does
 
 - Starts on a confirmation screen and does not write automatically.
