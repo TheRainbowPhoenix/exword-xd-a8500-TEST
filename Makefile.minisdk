@@ -39,7 +39,7 @@ $(D01): $(ELF)
 package: $(D01)
 	@set -e; for region in ja cn; do \
 		out="$(BUILDDIR)/$$region/$(APPID)"; \
-		mkdir -p "$$out"; cp "$(D01)" "$out/$(TARGET).d01"; \
+		mkdir -p "$$out"; cp "$(D01)" "$$out/$(TARGET).d01"; \
 		for f in html/$$region/*.htm; do \
 			[ -e "$$f" ] || continue; \
 			sed -e 's/@APPTITLE/$(APPTITLE)/g' -e 's/@APPID/$(APPID)/g' \
