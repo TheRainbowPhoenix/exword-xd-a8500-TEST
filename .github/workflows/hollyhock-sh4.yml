@@ -45,18 +45,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          file build-hollyhock/xdtest.elf build-hollyhock/xdtest.d01
+          file build-hollyhock/hexed.elf build-hollyhock/hexed.d01
           # The EX-word-specific linker script must place _start at ROM 0x70000080.
           grep -Eq 'Entry point address:[[:space:]]+0x70000080' build-hollyhock/elf-header.txt
           for region in ja cn; do
-            test -s "build-hollyhock/$region/XDTST/xdtest.d01"
-            test -f "build-hollyhock/$region/XDTST/diction.htm"
+            test -s "build-hollyhock/$region/HEXED/hexed.d01"
+            test -f "build-hollyhock/$region/HEXED/diction.htm"
           done
 
       - name: Upload experimental EX-word packages
         uses: actions/upload-artifact@v4
         with:
-          name: exword-xd-a8500-hollyhock-experimental
+          name: exword-hex-editor-hollyhock
           path: |
             build-hollyhock/ja/
             build-hollyhock/cn/
