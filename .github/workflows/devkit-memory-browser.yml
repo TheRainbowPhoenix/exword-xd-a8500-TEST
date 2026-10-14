@@ -53,7 +53,7 @@ jobs:
             test -f "build-devkit-memory/$region/MEMBR/fileinfo.cji"
           done
           cmp build-devkit-memory/ja/MEMBR/membr.d01 build-devkit-memory/cn/MEMBR/membr.d01
-          file membr.elf membr.d01
+          file membr.elf build-devkit-memory/ja/MEMBR/membr.d01
           echo "Compiled with ORIGINAL devkitSH4 and precompiled libdataplus" >> "$GITHUB_STEP_SUMMARY"
           echo "MEMBR is read-only, but arbitrary reads can still reboot hardware." >> "$GITHUB_STEP_SUMMARY"
 
