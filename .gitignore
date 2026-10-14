@@ -10,3 +10,6 @@ build-hollyhock/
 .deps/
 .mini-sdk/
 build-minisdk/
+
+# Legacy devkit-only raw memory browser
+build-devkit-memory/
