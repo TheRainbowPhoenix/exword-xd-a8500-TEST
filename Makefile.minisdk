@@ -8,12 +8,14 @@ SDK := $(abspath $(SDK_DIR))
 BUILDDIR := build-minisdk
 TARGET := hexed
 APPID := HEXED
+APPTITLE := EX-WORD HEX EDITOR
 ELF := $(BUILDDIR)/$(TARGET).elf
 D01 := $(BUILDDIR)/$(TARGET).d01
-CFILES := $(wildcard src/*.c src/libc/*.c)
+APP_MAIN ?= src/main.c
+CFILES := $(APP_MAIN) $(filter-out src/main.c,$(wildcard src/*.c)) $(wildcard src/libc/*.c)
 SFILES := $(wildcard src/*.s src/libc/*.s)
 OBJECTS := $(BUILDDIR)/exword/exword_crt0.o $(patsubst %.c,$(BUILDDIR)/%.o,$(CFILES)) $(patsubst %.s,$(BUILDDIR)/%.o,$(SFILES))
-CFLAGS := -std=gnu17 -O2 -ffreestanding -fno-builtin -Wall -Wextra -I$(SDK)/include -Isrc -Isrc/libc/include -MMD -MP
+CFLAGS := -std=gnu17 -O2 -ffreestanding -fno-builtin -Wall -Wextra -I$(SDK)/include -Isrc -Isrc/libc/include -MMD -MP $(EXTRA_CFLAGS)
 LDFLAGS := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(SDK)/lib
 LIBS := -ldataplus -lgraphics -lsh4a -lgcc
 .PHONY: all clean check package
@@ -37,11 +39,11 @@ $(D01): $(ELF)
 package: $(D01)
 	@for region in ja cn; do \
 		out="$(BUILDDIR)/$$region/$(APPID)"; \
-		mkdir -p "$$out"; cp "$(D01)" "$$out/hexed.d01"; \
+		mkdir -p "$$out"; cp "$(D01)" "$out/$(TARGET).d01"; \
 		for f in html/$$region/*.htm; do \
 			[ -e "$$f" ] || continue; \
-			sed -e 's/@APPTITLE/EX-WORD HEX EDITOR/g' -e 's/@APPID/HEXED/g' \
-			    -e 's/@APPMOD/hexed.d01/g' "$$f" > "$$out/$$(basename "$$f")"; \
+			sed -e 's/@APPTITLE/$(APPTITLE)/g' -e 's/@APPID/$(APPID)/g' \
+			    -e 's/@APPMOD/$(TARGET).d01/g' "$$f" > "$$out/$$(basename "$$f")"; \
 		done; touch "$$out/fileinfo.cji"; done
 clean:
 	rm -rf "$(BUILDDIR)"
