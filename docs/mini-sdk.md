@@ -1,6 +1,6 @@
 # Source-built EX-word mini SDK experiment
 
-This experiment removes the dependency on **MaxSignal's precompiled DevKitPRO
+The demo now builds the HEXED scratch-RAM hex editor. This experiment removes the dependency on **MaxSignal's precompiled DevKitPRO
 archive**. It does **not yet remove libdataplus APIs**: instead it recompiles
 libdataplus from its original source with Hollyhock's current SH4A GCC.
 
@@ -23,7 +23,7 @@ docker run --rm --platform linux/amd64 -v "$PWD:/work" -w /work \
 ```
 
 Outputs: `.mini-sdk/lib`, `.mini-sdk/include`, `.mini-sdk/bin/elf2d01`,
-and `build-minisdk/{ja,cn}/XDTST/`.
+and `build-minisdk/{ja,cn}/HEXED/`.
 
 ## Develop quickly using libdataplus-ex
 
