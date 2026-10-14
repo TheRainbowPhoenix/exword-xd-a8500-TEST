@@ -28,6 +28,7 @@ CFLAGS      := -Wall -std=gnu17 -fno-builtin \
 ASFLAGS     := -Wall -std=gnu17 -m4-nofpu
 
 .PHONY: app clean
+.SECONDARY: $(TARGET).d01
 app: $(addprefix build-devkit-memory/,$(addsuffix /$(APPID),$(BUILDS)))
 
 .SECONDEXPANSION:
