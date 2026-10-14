@@ -2,35 +2,49 @@ name: Build
 
 on:
   push:
-    tags: '*'
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
-    inputs:
-      tag:
-        type: string
-        description: 'Tag Name to be created'
+
+permissions:
+  contents: read
 
 jobs:
   build:
     name: Build EX-word addon
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Build
+        shell: bash
         run: |
-          cd ..
-          curl -sSfL https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz | tar -zxf -
-          cd -
-          DEVKITPRO="$OLDPWD/devkitPro" DEVKITSH4="$DEVKITPRO/devkitSH4" PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH" make
-          zip -r build.zip build
+          set -euo pipefail
+          # Keep using the toolchain that already builds the D01 successfully.
+          curl -fsSL https://github.com/MaxSignal/buildscripts/releases/download/Linux/devkitPro.tar.gz | tar -xz -C ..
+          export DEVKITPRO="$(cd .. && pwd)/devkitPro"
+          export DEVKITSH4="$DEVKITPRO/devkitSH4"
+          export PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH"
+          make
+          test -f build/ja/XDTST/xdtest.d01
+          test -f build/cn/XDTST/xdtest.d01
 
-      - name: Publish
-        run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            gh release create "${{ inputs.tag }}" -t "${{ inputs.tag }}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
-          else
-            gh release create "${GITHUB_REF/refs\/*s\//}" -t "${GITHUB_REF/refs\/*s\//}" -n "Automatic build of $(git rev-parse HEAD)." ./build.zip
-          fi
+      # Each artifact is automatically downloaded as a ZIP from GitHub Actions.
+      # The archive contains the ready-to-install XDTST/ directory.
+      - name: Upload Japanese package
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-xd-a8500-ja
+          path: build/ja/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Chinese package
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-xd-a8500-cn
+          path: build/cn/
+          if-no-files-found: error
+          retention-days: 30
