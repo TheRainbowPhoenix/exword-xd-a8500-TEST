@@ -5,10 +5,10 @@ $(error "Please set DEVKITSH4 in your environment. export DEVKITSH4=<path to sdk
 endif
 include $(DEVKITSH4)/exword_rules
 
-TARGET       := xdtest
-MODNAME      := xdtest
-APPTITLE     := XD-N8500 TEST
-APPID        := XDTST
+TARGET       := hexed
+MODNAME      := hexed
+APPTITLE     := EX-WORD HEX EDITOR
+APPID        := HEXED
 APPMOD       := $(TARGET).d01
 
 SOURCEDIR    := src

@@ -5,3 +5,8 @@ build/
 *.elf
 *.map
 build-hollyhock/
+
+# Independent mini SDK experiment
+.deps/
+.mini-sdk/
+build-minisdk/

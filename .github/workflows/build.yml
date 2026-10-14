@@ -28,15 +28,15 @@ jobs:
           export DEVKITSH4="$DEVKITPRO/devkitSH4"
           export PATH="$DEVKITPRO/tools/bin:$DEVKITSH4/bin:$PATH"
           make
-          test -f build/ja/XDTST/xdtest.d01
-          test -f build/cn/XDTST/xdtest.d01
+          test -f build/ja/HEXED/hexed.d01
+          test -f build/cn/HEXED/hexed.d01
 
       # Each artifact is automatically downloaded as a ZIP from GitHub Actions.
-      # The archive contains the ready-to-install XDTST/ directory.
+      # The archive contains the ready-to-install HEXED/ directory.
       - name: Upload Japanese package
         uses: actions/upload-artifact@v4
         with:
-          name: exword-xd-a8500-ja
+          name: exword-hex-editor-ja
           path: build/ja/
           if-no-files-found: error
           retention-days: 30
@@ -44,7 +44,7 @@ jobs:
       - name: Upload Chinese package
         uses: actions/upload-artifact@v4
         with:
-          name: exword-xd-a8500-cn
+          name: exword-hex-editor-cn
           path: build/cn/
           if-no-files-found: error
           retention-days: 30

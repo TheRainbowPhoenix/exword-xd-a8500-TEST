@@ -19,9 +19,9 @@ OBJDUMP     := $(PREFIX)objdump
 READELF     := $(PREFIX)readelf
 ELF2D01     ?= $(DEVKITPRO)/tools/bin/elf2d01
 
-APPID       := XDTST
-APPTITLE    := XD-N8500 TEST
-TARGET      := xdtest
+APPID       := HEXED
+APPTITLE    := EX-WORD HEX EDITOR
+TARGET      := hexed
 APPMOD      := $(TARGET).d01
 BUILDDIR    := build-hollyhock
 ELF         := $(BUILDDIR)/$(TARGET).elf
@@ -38,7 +38,7 @@ DEPFILES    := $(OBJECTS:.o=.d)
 # -mexword also supplies an EX-word linker script and startup stub; both are
 # now explicitly supplied in exword/ rather than relying on a default ELF link.
 CFLAGS      := -std=gnu17 -O2 -Wall -Wextra -ffreestanding -fno-builtin \
-               -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP
+               -I$(LIBDATAPLUS)/include -Isrc -Isrc/libc/include -MMD -MP $(EXTRA_CFLAGS)
 ASFLAGS     := -x assembler-with-cpp
 LDFLAGS     := -nostdlib -Wl,-Map,$(ELF).map -Wl,-T,exword/exword.ld -L$(LIBDATAPLUS)/lib
 LDLIBS      := -ldataplus -lgraphics -lsh4a -lgcc

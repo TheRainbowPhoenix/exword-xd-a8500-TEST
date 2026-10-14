@@ -1,0 +1,126 @@
+name: EXPERIMENT - Source-built EX-word mini SDK
+
+on:
+  push:
+    branches: [experiment/source-built-exword-sdk]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      libdataplus_ref:
+        description: 'Branch, tag or commit in TheRainbowPhoenix/libdataplus-ex'
+        type: string
+        required: false
+        default: master
+
+permissions:
+  contents: read
+
+jobs:
+  source-sdk:
+    name: Rebuild SDK with Hollyhock GCC (no DevKitPRO archive)
+    runs-on: ubuntu-24.04
+    env:
+      LIBDATAPLUS_REF: ${{ inputs.libdataplus_ref || 'master' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test scratch hex editor on host
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -I src \
+            src/hexedit.c tests/test_hexedit.c -o /tmp/exword-hexed-unit-test
+          /tmp/exword-hexed-unit-test
+
+      - name: Build native ELF-to-D01 tool from upstream source
+        run: |
+          set -euo pipefail
+          source sdk-exword/sources.env
+          mkdir -p .deps/elf2d01 .mini-sdk/bin
+          git -C .deps/elf2d01 init -q
+          git -C .deps/elf2d01 fetch -q --depth 1 https://github.com/brijohn/elf2d01.git "$ELF2D01_COMMIT"
+          git -C .deps/elf2d01 checkout -q --detach FETCH_HEAD
+          cc -O2 -Wall -Wextra .deps/elf2d01/elf2d01.c -o .mini-sdk/bin/elf2d01
+
+      - name: Rebuild all EX-word components from source
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" -w /work --entrypoint /bin/bash \
+            -e LIBDATAPLUS_REF \
+            ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
+            -ec 'git config --global --add safe.directory /work/.deps/elf2d01; export PATH=/toolchain/bin:$PATH; bash scripts/build-mini-sdk.sh'
+
+      - name: Build isolated EX-word diagnostic probes
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/work" -w /work --entrypoint /bin/bash \
+            ghcr.io/classpaddev/hollyhock-3:v2.2.2 \
+            -ec 'export PATH=/toolchain/bin:$PATH; bash scripts/build-diagnostic-probes.sh'
+          for variant in hello/HXHEL/hxhel grid/HXGRD/hxgrd; do
+            IFS=/ read -r build id executable <<< "$variant"
+            for region in ja cn; do
+              test -s "build-probes/$build/$region/$id/$executable.d01"
+              test -s "build-probes/$build/$region/$id/diction.htm"
+            done
+          done
+
+      - name: Validate executable, libraries and EX-word packages
+        run: |
+          set -euo pipefail
+          for lib in libdataplus libgraphics libsh4a; do test -s ".mini-sdk/lib/$lib.a"; done
+          test -x .mini-sdk/bin/elf2d01
+          for region in ja cn; do test -s "build-minisdk/$region/HEXED/hexed.d01"; done
+          grep -Eq 'Entry point address:[[:space:]]+0x70000080' build-minisdk/elf-header.txt
+          cmp build-minisdk/ja/HEXED/hexed.d01 build-minisdk/cn/HEXED/hexed.d01
+          file build-minisdk/hexed.elf build-minisdk/hexed.d01
+          grep -Fq 'libdataplus_repository=https://github.com/TheRainbowPhoenix/libdataplus-ex.git' .mini-sdk/source-provenance.txt
+          echo "## libdataplus-ex build provenance" >> "$GITHUB_STEP_SUMMARY"
+          cat .mini-sdk/source-provenance.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exword-hex-editor-minisdk
+          path: |
+            build-minisdk/ja/
+            build-minisdk/cn/
+            build-minisdk/elf-header.txt
+            .mini-sdk/source-provenance.txt
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exword-source-sdk-libraries
+          path: |
+            .mini-sdk/include/
+            .mini-sdk/lib/
+            .mini-sdk/bin/
+            .mini-sdk/source-provenance.txt
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      - name: Upload minimal hello display probe (HXHEL)
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-diagnostic-hxhel
+          path: |
+            build-probes/hello/ja/
+            build-probes/hello/cn/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      - name: Upload hex-like grid probe (HXGRD)
+        uses: actions/upload-artifact@v4
+        with:
+          name: exword-diagnostic-hxgrd
+          path: |
+            build-probes/grid/ja/
+            build-probes/grid/cn/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
