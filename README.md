@@ -1,22 +1,25 @@
-# MEMBR — white-theme EX-word raw memory browser
+# MEMBR — EX-word memory browser with OS/NOR view
 
-**New devkitSH4 build:** [MEMBR (read-only memory browser)](docs/devkit-memory-browser.md)
-explores any 32-bit address as hex + ASCII with a **white theme** and a
-**Jump-to-address editor**. It is compiled with the **original devkitSH4
-compiler and original prebuilt libdataplus**—the compiler/library combination
-whose Hello and grid probes both worked on real hardware.
+MEMBR runs using **the original devkitSH4 GCC and precompiled
+libdataplus** (your on-device test confirmed this toolchain works).
 
-[Download a Japanese or Chinese ZIP from the MEMBR build workflow](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/devkit-memory-browser.yml).
+The white-themed memory browser now supports read-only hex/ASCII views,
+8-digit Jump-to-address, and **S (own RAM), O (firmware/NOR),
+U (raw/unrestricted)** modes. The ordinary keyboard letter **J**
+opens Jump, in addition to the physical **ジャンプ / Jump Search** key
+(`KEY_JUMP = 74`).
 
-**This does not guarantee every address is actually readable.** The
-application performs direct volatile byte reads without a whitelist, and
-an unmapped or protected address can reboot or hang the EX-word. It begins
-in its own allocated RAM. The browser is **read only**, with no memory
-writes, file access, search or automatic scanning.
+**Important:** The firmware/NOR mode checks `CASIODICS` headers at
+`0x8000FF80` and `0x8001FF80`, following
+[dictscript's NOR dumper](https://github.com/dictscript/dictscript/blob/main/softwares/run-on-dictionary/NOR_dumper/src/nor_dumper.c).
+That first *header check itself* can still reboot an incompatible
+device. It requires explicit confirmation. In RAM and verified NOR
+views, addresses outside the enabled region show `--`; RAW deliberately
+retains the older unbounded reads and their crash risk. No writes or
+file dumps are performed.
 
-The old Hollyhock-based `HEXED` remains an unvalidated experiment,
-not the recommended hardware test. The known-working devkitSH4 Hello/grid
-probes remain unchanged.
+[Download the Japanese/Chinese devkitSH4 builds](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/devkit-memory-browser.yml) ·
+[Full controls, firmware reference and safety notes](docs/devkit-memory-browser.md)
 
 ---
 
