@@ -1,4 +1,5 @@
 # Source-build libdataplus with the HHK3/Hollyhock SH4A compiler.
+# Intentionally omit old devkit console/fs wrappers requiring sys/iosupport.h.
 .DEFAULT_GOAL := all
 CROSS_PREFIX ?= sh4a_nofpueb-elf-
 CC := $(CROSS_PREFIX)gcc
@@ -11,8 +12,8 @@ OBJ := $(DEST)/obj
 LIB := $(DEST)/lib
 INC := $(DEST)/include
 
-DP_C := $(wildcard $(SRC)/src/util/*.c $(SRC)/src/util/fixedptc/*.c $(SRC)/src/syscall/*.c $(SRC)/src/libc/*.c)
-DP_S := $(wildcard $(SRC)/src/libc/*.s)
+DP_C := $(wildcard $(SRC)/src/util/*.c $(SRC)/src/util/fixedptc/*.c $(SRC)/src/syscall/*.c)
+DP_S := # omit devkit-specific libc compatibility and _exit; the app supplies its own
 GR_C := $(wildcard $(SRC)/src/graphics/*.c)
 SH_C := $(wildcard $(SRC)/src/cpu/sh4a/input/*.c)
 SH_S := $(wildcard $(SRC)/src/cpu/sh4a/*.s)
