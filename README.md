@@ -7,6 +7,19 @@ by [CPHexEditor for HHK3](https://github.com/PyCSharp/CPHexEditor-For-HHK3),
 but this is a new EX-word-native C implementation; it does not require
 Hollyhock 3 ClassPad symbols.
 
+## Original toolchain crash-isolation packages
+
+**New: both comparison builds pass CI.** We now compile the same diagnostic
+Hello and grid sources against the **original precompiled libdataplus**
+using either the Hollyhock SH4A GCC or the original patched devkitSH4 GCC.
+
+See [compiler/lib compatibility matrix, download instructions and test order](docs/compiler-crash-matrix.md).
+The [comparison workflow](https://github.com/TheRainbowPhoenix/exword-xd-a8500-TEST/actions/workflows/compare-original-lib.yml)
+publishes two ZIPs: `probes-devkit-original-lib` with `DVLLO`/`DVGRD`,
+and `probes-hollyhock-original-lib` with `HHLLO`/`HHGRD`.
+**Test DVLLO first**, and stop if it reboots. These builds have not yet
+been tested on physical hardware; do not rerun the known-crashing HEXED.
+
 ## Crash investigation (hardware feedback)
 
 **A user reports that the current HEXED binary makes their EX-word reboot.**
