@@ -24,6 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test scratch hex editor on host
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -I src \
+            src/hexedit.c tests/test_hexedit.c -o /tmp/exword-hexed-unit-test
+          /tmp/exword-hexed-unit-test
+
       - name: Build native ELF-to-D01 tool from upstream source
         run: |
           set -euo pipefail
@@ -48,17 +55,17 @@ jobs:
           set -euo pipefail
           for lib in libdataplus libgraphics libsh4a; do test -s ".mini-sdk/lib/$lib.a"; done
           test -x .mini-sdk/bin/elf2d01
-          for region in ja cn; do test -s "build-minisdk/$region/XDTST/xdtest.d01"; done
+          for region in ja cn; do test -s "build-minisdk/$region/HEXED/hexed.d01"; done
           grep -Eq 'Entry point address:[[:space:]]+0x70000080' build-minisdk/elf-header.txt
-          cmp build-minisdk/ja/XDTST/xdtest.d01 build-minisdk/cn/XDTST/xdtest.d01
-          file build-minisdk/xdtest.elf build-minisdk/xdtest.d01
+          cmp build-minisdk/ja/HEXED/hexed.d01 build-minisdk/cn/HEXED/hexed.d01
+          file build-minisdk/hexed.elf build-minisdk/hexed.d01
           grep -Fq 'libdataplus_repository=https://github.com/TheRainbowPhoenix/libdataplus-ex.git' .mini-sdk/source-provenance.txt
           echo "## libdataplus-ex build provenance" >> "$GITHUB_STEP_SUMMARY"
           cat .mini-sdk/source-provenance.txt >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: exword-source-sdk-experiment
+          name: exword-hex-editor-minisdk
           path: |
             build-minisdk/ja/
             build-minisdk/cn/
