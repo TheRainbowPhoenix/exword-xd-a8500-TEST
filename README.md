@@ -1,5 +1,13 @@
 # NORSD — small EX-word NOR-to-SD dumper
 
+**Updated NORSD diagnostic:** The original binary could report DUMP
+COMPLETED without readback verification. The latest NORSD now has an
+optional **T → Enter** 16-byte SD file test; test that first if a full
+dump wasn't visible through libexword. It reopens saved files, checks
+their actual sizes and reads back the initial bytes.
+[SD diagnosis and full notes](docs/nor-to-sd.md).
+
+
 **NEW:** [NORSD](docs/nor-to-sd.md) writes a read-only image of the mapped
 NOR window to an ordinary file on the **removable SD/TF card (crd0)**.
 It's compiled with the original devkitSH4 GCC and original precompiled
