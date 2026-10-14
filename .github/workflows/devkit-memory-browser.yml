@@ -1,4 +1,4 @@
-name: EXPERIMENT - Devkit unrestricted memory browser
+name: EXPERIMENT - Devkit memory browser (NOR-aware)
 
 on:
   push:
@@ -24,6 +24,10 @@ jobs:
             memory_browser/memory_browser.c tests/test_memory_browser.c \
             -o /tmp/exword-memory-browser-unit
           /tmp/exword-memory-browser-unit
+          cc -std=c11 -Wall -Wextra -Werror \
+            memory_browser/memory_regions.c tests/test_memory_regions.c \
+            -o /tmp/exword-memory-regions-unit
+          /tmp/exword-memory-regions-unit
 
       - name: Install original devkitSH4 and original libdataplus
         shell: bash
@@ -55,7 +59,7 @@ jobs:
           cmp build-devkit-memory/ja/MEMBR/membr.d01 build-devkit-memory/cn/MEMBR/membr.d01
           file membr.elf build-devkit-memory/ja/MEMBR/membr.d01
           echo "Compiled with ORIGINAL devkitSH4 and precompiled libdataplus" >> "$GITHUB_STEP_SUMMARY"
-          echo "MEMBR is read-only, but arbitrary reads can still reboot hardware." >> "$GITHUB_STEP_SUMMARY"
+          echo "MEMBR starts in its own RAM and skips unknown addresses; opt-in NOR header probe and raw mode may still reboot hardware." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Japanese MEMBR ZIP
         uses: actions/upload-artifact@v4
